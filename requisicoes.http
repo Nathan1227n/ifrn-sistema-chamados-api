@@ -1,0 +1,245 @@
+@baseUrl = http://localhost:8080
+
+### Criar setor temporário — 201
+POST {{baseUrl}}/setores
+Content-Type: application/json
+
+{"nome":"Biblioteca","sigla":"BIB"}
+
+> {% client.global.set("setorNovoId", response.body.id); %}
+
+### Listar setores com filtro e paginação — 200
+GET {{baseUrl}}/setores?nome=biblio&page=0&size=10&sort=nome,asc
+
+### Consultar setor — 200
+GET {{baseUrl}}/setores/{{setorNovoId}}
+
+### Atualizar setor — 200
+PUT {{baseUrl}}/setores/{{setorNovoId}}
+Content-Type: application/json
+
+{"nome":"Biblioteca Central","sigla":"BIB"}
+
+### Categorias do setor COTIC — 200, paginado
+GET {{baseUrl}}/setores/1/categorias?page=0&size=10&sort=nome,asc
+
+### Criar categoria temporária — 201
+POST {{baseUrl}}/categorias
+Content-Type: application/json
+
+{"nome":"Acervo","descricao":"Suporte ao acervo","setorId":{{setorNovoId}}}
+
+> {% client.global.set("categoriaNovaId", response.body.id); %}
+
+### Listar categorias com filtros — 200
+GET {{baseUrl}}/categorias?nome=acervo&setorId={{setorNovoId}}&page=0&size=10
+
+### Consultar categoria — 200
+GET {{baseUrl}}/categorias/{{categoriaNovaId}}
+
+### Atualizar categoria — 200
+PUT {{baseUrl}}/categorias/{{categoriaNovaId}}
+Content-Type: application/json
+
+{"nome":"Acervo Geral","descricao":"Apoio à biblioteca","setorId":{{setorNovoId}}}
+
+### Excluir setor com categoria — 409
+DELETE {{baseUrl}}/setores/{{setorNovoId}}
+
+### Excluir categoria sem chamados — 204
+DELETE {{baseUrl}}/categorias/{{categoriaNovaId}}
+
+### Excluir setor sem vínculos — 204
+DELETE {{baseUrl}}/setores/{{setorNovoId}}
+
+### Criar solicitante — 201 (execute uma vez por banco)
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{"nome":"Eva Santos","email":"eva@ifrn.edu.br","matricula":"20260005","tipo":"SOLICITANTE"}
+
+> {% client.global.set("usuarioNovoId", response.body.id); %}
+
+### Criar técnico com setor válido — 201 (execute uma vez por banco)
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{"nome":"Felipe Alves","email":"felipe@ifrn.edu.br","matricula":"20260006","tipo":"TECNICO","setorId":1}
+
+### Listar usuários com filtros — 200
+GET {{baseUrl}}/usuarios?nome=car&tipo=TECNICO&setorId=1&page=0&size=10&sort=nome,asc
+
+### Consultar usuário — 200
+GET {{baseUrl}}/usuarios/{{usuarioNovoId}}
+
+### Atualizar usuário — 200
+PUT {{baseUrl}}/usuarios/{{usuarioNovoId}}
+Content-Type: application/json
+
+{"nome":"Eva Santos Lima","email":"eva@ifrn.edu.br","matricula":"20260005","tipo":"SOLICITANTE"}
+
+### Email duplicado, mesmo com maiúsculas — 409
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{"nome":"Outra Ana","email":"ANA@ifrn.edu.br","matricula":"20269999","tipo":"SOLICITANTE"}
+
+### Técnico sem setor — 409
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{"nome":"Técnico","email":"tecnico@ifrn.edu.br","matricula":"20269998","tipo":"TECNICO"}
+
+### Abrir chamado de equipamento de TI — 201
+POST {{baseUrl}}/chamados
+Content-Type: application/json
+
+{"titulo":"Projetor não funciona","descricao":"O projetor não liga.","local":"Sala 12","prioridade":"ALTA","categoriaId":2,"solicitanteId":1}
+
+> {% client.global.set("chamadoId", response.body.id); %}
+
+### Exemplo obrigatório: filtros combinados — 200
+GET {{baseUrl}}/chamados?status=ABERTO&setorId=1&prioridade=ALTA&page=0&size=10&sort=dataAbertura,desc
+
+### Todos os filtros disponíveis (ajuste as datas ao dia da abertura) — 200
+GET {{baseUrl}}/chamados?status=ABERTO&prioridade=ALTA&setorId=1&categoriaId=2&solicitanteId=1&dataInicio=2026-10-01&dataFim=2026-10-30&page=0&size=10&sort=id,desc
+
+### Consultar chamado com histórico — 200
+GET {{baseUrl}}/chamados/{{chamadoId}}
+
+### Interação do solicitante antes de atribuir — 201
+POST {{baseUrl}}/chamados/{{chamadoId}}/interacoes
+Content-Type: application/json
+
+{"autorId":1,"texto":"O problema continua acontecendo."}
+
+### Usuário sem vínculo não interage — 409
+POST {{baseUrl}}/chamados/{{chamadoId}}/interacoes
+Content-Type: application/json
+
+{"autorId":2,"texto":"Tentativa sem vínculo."}
+
+### Técnico de outro setor não assume — 409
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/assumir
+Content-Type: application/json
+
+{"tecnicoId":4}
+
+### Assumir com técnico da COTIC — 200
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/assumir
+Content-Type: application/json
+
+{"tecnicoId":3}
+
+### Reassumir em andamento — 409
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/assumir
+Content-Type: application/json
+
+{"tecnicoId":3}
+
+### Interação do técnico atribuído — 201
+POST {{baseUrl}}/chamados/{{chamadoId}}/interacoes
+Content-Type: application/json
+
+{"autorId":3,"texto":"Verificarei a fonte do projetor."}
+
+### Chamados do solicitante — 200
+GET {{baseUrl}}/usuarios/1/chamados?status=EM_ATENDIMENTO&page=0&size=10
+
+### Chamados atribuídos ao técnico — 200
+GET {{baseUrl}}/usuarios/3/chamados?status=EM_ATENDIMENTO&page=0&size=10
+
+### Filtro por técnico — 200
+GET {{baseUrl}}/chamados?tecnicoId=3&status=EM_ATENDIMENTO&page=0&size=10
+
+### Não cancelar em atendimento — 409
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/cancelar
+Content-Type: application/json
+
+{"solicitanteId":1}
+
+### Não resolver sem solução — 409
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/resolver
+Content-Type: application/json
+
+{"tecnicoId":3,"solucao":"   "}
+
+### Outro técnico não resolve — 409
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/resolver
+Content-Type: application/json
+
+{"tecnicoId":4,"solucao":"Tentativa de resolução."}
+
+### Resolver com técnico atribuído — 200
+PATCH {{baseUrl}}/chamados/{{chamadoId}}/resolver
+Content-Type: application/json
+
+{"tecnicoId":3,"solucao":"Projetor reparado com substituição da fonte."}
+
+### Conferir solução, fechamento e histórico — 200
+GET {{baseUrl}}/chamados/{{chamadoId}}
+
+### Resolvido não recebe interação — 409
+POST {{baseUrl}}/chamados/{{chamadoId}}/interacoes
+Content-Type: application/json
+
+{"autorId":1,"texto":"Nova mensagem após encerramento."}
+
+### Categoria com chamado não pode ser excluída — 409
+DELETE {{baseUrl}}/categorias/2
+
+### Setor com chamado não pode ser excluído — 409
+DELETE {{baseUrl}}/setores/1
+
+### Abrir outro chamado sem prioridade (padrão MEDIA) — 201
+POST {{baseUrl}}/chamados
+Content-Type: application/json
+
+{"titulo":"Lâmpada apagada","descricao":"A iluminação não funciona.","local":"Sala 15","categoriaId":4,"solicitanteId":2}
+
+> {% client.global.set("chamadoCancelarId", response.body.id); %}
+
+### Outro solicitante não cancela — 409
+PATCH {{baseUrl}}/chamados/{{chamadoCancelarId}}/cancelar
+Content-Type: application/json
+
+{"solicitanteId":1}
+
+### Cancelar chamado aberto — 200
+PATCH {{baseUrl}}/chamados/{{chamadoCancelarId}}/cancelar
+Content-Type: application/json
+
+{"solicitanteId":2}
+
+### Cancelado não pode ser assumido — 409
+PATCH {{baseUrl}}/chamados/{{chamadoCancelarId}}/assumir
+Content-Type: application/json
+
+{"tecnicoId":4}
+
+### Técnico não abre chamado — 409
+POST {{baseUrl}}/chamados
+Content-Type: application/json
+
+{"titulo":"Teste","descricao":"Tentativa por técnico","local":"Sala 1","categoriaId":1,"solicitanteId":3}
+
+### Validação Bean Validation — 400
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{"nome":"","email":"email-invalido","matricula":"","tipo":"SOLICITANTE"}
+
+### Enum inválido — 400
+GET {{baseUrl}}/chamados?status=FECHADO
+
+### Data inválida — 400
+GET {{baseUrl}}/chamados?dataInicio=30-10-2026
+
+### Intervalo invertido — 400
+GET {{baseUrl}}/chamados?dataInicio=2026-10-31&dataFim=2026-10-30
+
+### Paginação inválida — 400
+GET {{baseUrl}}/setores?page=-1
+
+### Recurso inexistente — 404
+GET {{baseUrl}}/chamados/999999999
